@@ -19,9 +19,13 @@ import requests
 from bs4 import BeautifulSoup
 from PIL import Image
 import io
+import random
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Referer': 'https://novelmania.com.br/',
 }
 
 CSS_STYLE = """
@@ -240,14 +244,73 @@ def clean_paragraph_html(p_raw: str, local_images_map: dict) -> str:
     return f'<p>{p_content}</p>'
 
 
+def safe_get(session_or_requests, url: str, max_retries: int = 8, timeout: int = 30, initial_backoff: float = 4.0, headers: dict = None) -> requests.Response:
+    """
+    Executa uma requisição GET com tratamento automático de HTTP 429 (Rate Limit),
+    erros de conexão e respostas 5xx de servidor com backoff exponencial e jitter.
+    """
+    retries = 0
+    backoff = initial_backoff
+    req_obj = session_or_requests if session_or_requests is not None else requests
+
+    while True:
+        try:
+            kwargs = {'timeout': timeout}
+            if headers:
+                kwargs['headers'] = headers
+
+            res = req_obj.get(url, **kwargs)
+
+            if res.status_code == 429:
+                retries += 1
+                if retries > max_retries:
+                    res.raise_for_status()
+
+                # Verifica se o servidor enviou header Retry-After
+                retry_after = res.headers.get('Retry-After')
+                if retry_after and retry_after.isdigit():
+                    wait_time = int(retry_after) + random.uniform(1.0, 3.0)
+                else:
+                    wait_time = backoff + random.uniform(1.0, 3.0)
+                    backoff = min(backoff * 2.0, 60.0)
+
+                print(f"\n[Aviso 429] Limite de requisições do Novel Mania atingido. Aguardando {wait_time:.1f}s antes de tentar novamente... (Tentativa {retries}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+
+            elif res.status_code in (500, 502, 503, 504):
+                retries += 1
+                if retries > max_retries:
+                    res.raise_for_status()
+
+                wait_time = backoff + random.uniform(0.5, 2.0)
+                backoff = min(backoff * 1.5, 30.0)
+                print(f"\n[Aviso {res.status_code}] Erro temporário no servidor. Aguardando {wait_time:.1f}s... (Tentativa {retries}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+
+            if res.status_code != 404:
+                res.raise_for_status()
+
+            return res
+
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            retries += 1
+            if retries > max_retries:
+                raise
+            wait_time = backoff + random.uniform(1.0, 2.5)
+            backoff = min(backoff * 1.5, 30.0)
+            print(f"\n[Falha de conexão] {e.__class__.__name__}. Aguardando {wait_time:.1f}s... (Tentativa {retries}/{max_retries})")
+            time.sleep(wait_time)
+
+
 def fetch_novel_info(slug: str, session: requests.Session) -> dict:
     """Obtém os dados da obra pela API do Novel Mania."""
     api_url = f"https://novelmania.com.br/api/novels/{slug}"
     print(f"Buscando informações da obra: {api_url} ...")
-    r = session.get(api_url, timeout=20)
+    r = safe_get(session, api_url, timeout=20)
     if r.status_code == 404:
         raise ValueError(f"Obra '{slug}' não encontrada no Novel Mania (404).")
-    r.raise_for_status()
     data = r.json().get('data', {})
     return data
 
@@ -261,8 +324,7 @@ def fetch_all_chapters_list(slug: str, session: requests.Session) -> list:
     
     while True:
         url = f"https://novelmania.com.br/api/novels/{slug}/chapters?page={page}&limit={limit}"
-        r = session.get(url, timeout=20)
-        r.raise_for_status()
+        r = safe_get(session, url, timeout=20)
         res = r.json()
         items = res.get('data', [])
         if not items:
@@ -274,7 +336,7 @@ def fetch_all_chapters_list(slug: str, session: requests.Session) -> list:
         if page >= total_pages:
             break
         page += 1
-        time.sleep(0.2)
+        time.sleep(random.uniform(0.3, 0.6))
         
     return chapters
 
@@ -283,8 +345,7 @@ def download_and_optimize_image(url: str, dest_path: str, max_width=1600, qualit
     """Baixa e otimiza uma imagem para visualização em EPUB."""
     if os.path.exists(dest_path):
         return
-    r = requests.get(url, headers=HEADERS, timeout=30)
-    r.raise_for_status()
+    r = safe_get(None, url, headers=HEADERS, timeout=30)
     img = Image.open(io.BytesIO(r.content))
     if img.mode != 'RGB':
         img = img.convert('RGB')
@@ -292,6 +353,7 @@ def download_and_optimize_image(url: str, dest_path: str, max_width=1600, qualit
         new_height = int(img.height * (max_width / img.width))
         img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
     img.save(dest_path, 'JPEG', quality=quality, optimize=True)
+    time.sleep(random.uniform(0.2, 0.5))
 
 
 def sanitize_filename(name: str) -> str:
@@ -642,12 +704,12 @@ def process_novel(slug: str):
                 ch_html = f.read()
         else:
             print(f"[{idx}/{len(chapters_meta)}] Baixando capítulo: {ch_meta.get('title') or ch_slug}...")
-            res = session.get(ch_url, timeout=25)
-            res.raise_for_status()
+            res = safe_get(session, ch_url, timeout=25)
             ch_html = res.text
             with open(raw_html_path, 'w', encoding='utf-8') as f:
                 f.write(ch_html)
-            time.sleep(0.25)
+            # Intervalo inteligente para respeitar o rate-limit do servidor
+            time.sleep(random.uniform(0.7, 1.3))
             
         soup = BeautifulSoup(ch_html, 'lxml')
         
@@ -714,6 +776,11 @@ def process_novel(slug: str):
             'images': images
         }
         updated_data.append(entry)
+
+        # Salva o progresso a cada 10 capítulos
+        if idx % 10 == 0:
+            with open(chapters_content_file, 'w', encoding='utf-8') as f:
+                json.dump(updated_data, f, indent=2, ensure_ascii=False)
         
     with open(chapters_content_file, 'w', encoding='utf-8') as f:
         json.dump(updated_data, f, indent=2, ensure_ascii=False)

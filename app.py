@@ -10,7 +10,7 @@ import re
 import zipfile
 import requests
 import gradio as gr
-from generate_novel import process_novel, HEADERS
+from generate_novel import process_novel, HEADERS, safe_get
 
 # Compatibilidade com Hugging Face ZeroGPU (evita o erro 'No @spaces.GPU function detected')
 try:
@@ -43,10 +43,9 @@ def fetch_preview(slug_or_url: str):
 
     api_url = f"https://novelmania.com.br/api/novels/{slug}"
     try:
-        r = requests.get(api_url, headers=HEADERS, timeout=10)
+        r = safe_get(None, api_url, headers=HEADERS, timeout=10)
         if r.status_code == 404:
             return None, f"❌ Obra '{slug}' não encontrada no Novel Mania (404).", ""
-        r.raise_for_status()
         data = r.json().get('data', {})
 
         title = data.get('title', slug)
