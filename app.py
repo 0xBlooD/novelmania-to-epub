@@ -104,7 +104,7 @@ CUSTOM_CSS = """
 }
 """
 
-with gr.Blocks(title="Novel Mania to EPUB", css=CUSTOM_CSS, theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Novel Mania to EPUB") as demo:
     gr.Markdown("""
     # 📚 Novel Mania to EPUB Generator
     Gere arquivos **EPUB** de alta qualidade das obras traduzidas no [Novel Mania](https://novelmania.com.br).
@@ -163,4 +163,8 @@ with gr.Blocks(title="Novel Mania to EPUB", css=CUSTOM_CSS, theme=gr.themes.Soft
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 7860))
-    demo.launch(server_name="0.0.0.0", server_port=port)
+    demo.launch(server_name="0.0.0.0", server_port=port, theme=gr.themes.Soft(), css=CUSTOM_CSS)
+else:
+    # Quando o Hugging Face importa como módulo
+    demo.theme = gr.themes.Soft()
+    demo.css = CUSTOM_CSS
