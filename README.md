@@ -1,3 +1,13 @@
+---
+title: Novel Mania to EPUB
+emoji: 📚
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Novel Mania EPUB Generator
 
 Gerador automatizado de arquivos **EPUB** em padrão de alta qualidade para obras traduzidas disponibilizadas no site [Novel Mania](https://novelmania.com.br).
@@ -39,6 +49,36 @@ python generate_novel.py 5-centimetros-por-segundo
 ```
 
 > **Atalho:** Você também pode rodar `python build_epubs.py`, que por padrão gera os volumes de Hyouka.
+
+### 3. Rodar a Interface Web / API Localmente
+Você também pode iniciar o servidor web com interface gráfica:
+
+```bash
+uvicorn app:app --port 7860 --reload
+```
+Acesse no seu navegador: `http://localhost:7860`.
+
+#### Endpoints da API:
+- `GET /api/info?slug={slug}`: Retorna metadados, contagem de capítulos e prévia da capa.
+- `GET /api/download?slug={slug}`: Gera os EPUBs da obra e faz o streaming direto do arquivo `.zip`.
+
+---
+
+## ☁️ Deploy no Hugging Face Spaces
+
+O repositório já está 100% configurado para rodar no **Hugging Face Spaces** com **Docker**:
+
+1. Crie um novo Space no Hugging Face: [huggingface.co/new-space](https://huggingface.co/new-space).
+2. Defina:
+   - **Space SDK:** `Docker` (Blank)
+   - **Hardware:** `CPU basic (gratuito - 16 GB RAM)`
+   - **Visibility:** `Public` ou `Private`
+3. Conecte com o seu repositório GitHub ou envie os arquivos via Git para o remote do Space:
+   ```bash
+   git remote add space https://huggingface.co/spaces/<seu-usuario>/<nome-do-space>
+   git push space main
+   ```
+4. O Hugging Face construirá o contêiner automaticamente e fornecerá uma URL pública gratuita!
 
 ---
 
