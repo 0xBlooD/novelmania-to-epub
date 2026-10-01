@@ -3,8 +3,8 @@ title: Novel Mania to EPUB
 emoji: 📚
 colorFrom: indigo
 colorTo: purple
-sdk: docker
-app_port: 7860
+sdk: gradio
+app_file: app.py
 pinned: false
 ---
 
@@ -32,8 +32,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Gerar EPUBs de Qualquer Obra
-Basta rodar o script passando o **slug** da obra (a parte final da URL da novel no site):
+### 2. Gerar EPUBs via Linha de Comando (CLI)
+Basta rodar o script passando o **slug** ou a **URL completa** da obra no Novel Mania:
 
 ```bash
 python generate_novel.py <slug>
@@ -44,65 +44,58 @@ python generate_novel.py <slug>
 # Para Hyouka (https://novelmania.com.br/novels/hyouka)
 python generate_novel.py hyouka
 
-# Para 5 Centímetros por Segundo (https://novelmania.com.br/novels/5-centimetros-por-segundo)
+# Para Amor Invisível Sob o Céu Noturno
+python generate_novel.py amor-invisivel-sob-o-ceu-noturno
+
+# Para 5 Centímetros por Segundo
 python generate_novel.py 5-centimetros-por-segundo
 ```
 
 > **Atalho:** Você também pode rodar `python build_epubs.py`, que por padrão gera os volumes de Hyouka.
 
-### 3. Rodar a Interface Web / API Localmente
-Você também pode iniciar o servidor web com interface gráfica:
+### 3. Rodar a Interface Web (Gradio) Localmente
+Para usar uma interface gráfica amigável no navegador com pré-visualização e download direto em `.zip`:
 
 ```bash
-uvicorn app:app --port 7860 --reload
+python app.py
 ```
 Acesse no seu navegador: `http://localhost:7860`.
 
-#### Endpoints da API:
-- `GET /api/info?slug={slug}`: Retorna metadados, contagem de capítulos e prévia da capa.
-- `GET /api/download?slug={slug}`: Gera os EPUBs da obra e faz o streaming direto do arquivo `.zip`.
-
 ---
 
-## ☁️ Deploy no Hugging Face Spaces
+## ☁️ Deploy Gratuito no Hugging Face Spaces
 
-O repositório já está 100% configurado para rodar no **Hugging Face Spaces** com **Docker**:
+O repositório está configurado para o SDK **Gradio** do Hugging Face Spaces:
 
 1. Crie um novo Space no Hugging Face: [huggingface.co/new-space](https://huggingface.co/new-space).
-2. Defina:
-   - **Space SDK:** `Docker` (Blank)
-   - **Hardware:** `CPU basic (gratuito - 16 GB RAM)`
-   - **Visibility:** `Public` ou `Private`
-3. Conecte com o seu repositório GitHub ou envie os arquivos via Git para o remote do Space:
+2. Configure:
+   - **Space SDK:** `Gradio`
+   - **Template:** `Blank`
+   - **Space Hardware:** `CPU basic (100% gratuito)`
+3. Conecte com o seu repositório GitHub ou envie os arquivos via Git para o Space:
    ```bash
    git remote add space https://huggingface.co/spaces/<seu-usuario>/<nome-do-space>
    git push space main
    ```
-4. O Hugging Face construirá o contêiner automaticamente e fornecerá uma URL pública gratuita!
+4. O Hugging Face iniciará o app automaticamente na URL pública do seu Space!
 
 ---
 
-## 📁 Estrutura de Pastas Gerada
+## 📁 Estrutura de Pastas Gerada (Localmente)
 
-Para manter o repositório limpo ao versionar no Git/GitHub, o gerador cria uma pasta com prefixo `epub_<slug>`:
+Quando você executa o script na sua máquina, os arquivos são organizados localmente na pasta `epub_<slug>`:
 
 ```text
-epub_hyouka/
-├── .cache_chapters/    # Cache dos HTMLs brutos e dados parseados dos capítulos
+epub_<slug>/
+├── .cache_chapters/    # Cache dos HTMLs brutos e dados dos capítulos
 ├── .cache_covers/      # Capas em alta resolução otimizadas para e-readers
 ├── .cache_images/      # Ilustrações internas dos capítulos baixadas localmente
-└── novel/              # Arquivos .epub finais gerados
-    ├── Hyouka - Volume 1.epub
-    ├── Hyouka - Volume 2 - O Fim de Jogo do Tolo.epub
-    ├── Hyouka - Volume 3 - A Ordem de Kudryavka.epub
-    ├── Hyouka - Volume 4 - A Boneca que Faz Desvio.epub
-    ├── Hyouka - Volume 5 - A Estimativa da Distancia entre Dois.epub
-    └── Hyouka - Volume 6 - Mesmo Que Me Digam Que Agora Tenho Asas.epub
+├── novel/              # Arquivos .epub gerados prontos para leitura
+└── <slug>_epubs.zip    # Arquivo ZIP consolidado (criado via Web UI)
 ```
 
-> **Git & GitHub:** O arquivo `.gitignore` já está configurado com `epub_*` para garantir que nem os arquivos pesados de cache nem os arquivos `.epub` gerados sejam enviados acidentalmente para o repositório.
-
-O sistema de cache evita requisições redundantes ao site: se você rodar o comando novamente para uma obra já baixada, a compilação leva apenas alguns segundos.
+> 🔒 **Importante sobre o Git / GitHub:**  
+> O arquivo `.gitignore` deste repositório está configurado com `epub_*` e `*.epub`. Portanto, **nenhuma pasta de novel gerada, arquivo de cache ou EPUB é enviado para o GitHub**, mantendo o repositório 100% limpo, leve e focado apenas no código-fonte.
 
 ---
 
@@ -117,7 +110,7 @@ O [Novel Mania](https://novelmania.com.br) é uma aplicação moderna construíd
 ### 2. Catálogo e Agrupamento de Volumes (API REST Paginada)
 * **Endpoint:** `GET https://novelmania.com.br/api/novels/{slug}/chapters?page={N}&limit=50`
 * **Dados obtidos:** A lista completa de capítulos na ordem correta, slugs de leitura, créditos da equipe (`translators` e `editors`), e o objeto `unity`:
-  * O campo `unity.name` indica a qual volume o capítulo pertence (ex: *Volume 1*, *Volume 2* ou *Volume Único*). Isso permite ao gerador agrupar com precisão matemática os capítulos em seus respectivos livros.
+  * O campo `unity.name` indica a qual volume o capítulo pertence (ex: *Volume 1*, *Volume 2* ou *Volume Único*). Isso permite ao gerador agrupar com precisão os capítulos em seus respectivos livros.
 
 ### 3. Conteúdo Completo dos Capítulos (Páginas SSR)
 * Embora o endpoint direto de texto via API exija autenticação (403), as páginas web públicas de leitura (`https://novelmania.com.br/novels/{slug}/capitulos/{chapter_slug}`) entregam o HTML completo já pré-renderizado no servidor (SSR).
@@ -140,15 +133,15 @@ Os arquivos são empacotados seguindo rigidamente os padrões do IDPF / W3C:
 
 ---
 
-## 📖 Obra Atual no Repositório: Hyouka
+## 📖 Exemplo de Obra Testada: Hyouka
 
-Os 48 capítulos traduzidos de **Hyouka: Série Clube de Literatura Clássica** (por Honobu Yonezawa, traduzido por slag) já estão compilados e validados na pasta [epub_hyouka/novel/](epub_hyouka/novel/):
+Ao executar `python generate_novel.py hyouka`, os 48 capítulos traduzidos de **Hyouka: Série Clube de Literatura Clássica** (Honobu Yonezawa / tradução por slag) são compilados localmente na pasta `epub_hyouka/novel/`:
 
-| Arquivo EPUB | Volume | Subtítulo Original | Capítulos |
+| Arquivo Gerado Localmente | Volume | Subtítulo Original | Capítulos |
 | :--- | :--- | :--- | :---: |
-| [`Hyouka - Volume 1.epub`](epub_hyouka/novel/Hyouka%20-%20Volume%201.epub) | Volume 1 | *The niece of time* | 9 capítulos |
-| [`Hyouka - Volume 2 - O Fim de Jogo do Tolo.epub`](epub_hyouka/novel/Hyouka%20-%20Volume%202%20-%20O%20Fim%20de%20Jogo%20do%20Tolo.epub) | Volume 2 | *Why didn't she ask Eba?* | 7 capítulos (com mapa ilustrado) |
-| [`Hyouka - Volume 3 - A Ordem de Kudryavka.epub`](epub_hyouka/novel/Hyouka%20-%20Volume%203%20-%20A%20Ordem%20de%20Kudryavka.epub) | Volume 3 | *Welcome to Kanya Festa!* | 13 capítulos |
-| [`Hyouka - Volume 4 - A Boneca que Faz Desvio.epub`](epub_hyouka/novel/Hyouka%20-%20Volume%204%20-%20A%20Boneca%20que%20Faz%20Desvio.epub) | Volume 4 | *Little birds can remember* | 7 capítulos |
-| [`Hyouka - Volume 5 - A Estimativa da Distancia entre Dois.epub`](epub_hyouka/novel/Hyouka%20-%20Volume%205%20-%20A%20Estimativa%20da%20Distancia%20entre%20Dois.epub) | Volume 5 | *It walks by past* | 7 capítulos (inclui Epílogo) |
-| [`Hyouka - Volume 6 - Mesmo Que Me Digam Que Agora Tenho Asas.epub`](epub_hyouka/novel/Hyouka%20-%20Volume%206%20-%20Mesmo%20Que%20Me%20Digam%20Que%20Agora%20Tenho%20Asas.epub) | Volume 6 | *Even Though I'm Told Now That I Have Wings* | 5 capítulos |
+| `Hyouka - Volume 1.epub` | Volume 1 | *The niece of time* | 9 capítulos |
+| `Hyouka - Volume 2 - O Fim de Jogo do Tolo.epub` | Volume 2 | *Why didn't she ask Eba?* | 7 capítulos (com mapa ilustrado) |
+| `Hyouka - Volume 3 - A Ordem de Kudryavka.epub` | Volume 3 | *Welcome to Kanya Festa!* | 13 capítulos |
+| `Hyouka - Volume 4 - A Boneca que Faz Desvio.epub` | Volume 4 | *Little birds can remember* | 7 capítulos |
+| `Hyouka - Volume 5 - A Estimativa da Distancia entre Dois.epub` | Volume 5 | *It walks by past* | 7 capítulos (inclui Epílogo) |
+| `Hyouka - Volume 6 - Mesmo Que Me Digam Que Agora Tenho Asas.epub` | Volume 6 | *Even Though I'm Told Now That I Have Wings* | 5 capítulos |
