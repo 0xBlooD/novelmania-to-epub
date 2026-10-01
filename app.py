@@ -12,6 +12,15 @@ import requests
 import gradio as gr
 from generate_novel import process_novel, HEADERS
 
+# Compatibilidade com Hugging Face ZeroGPU (evita o erro 'No @spaces.GPU function detected')
+try:
+    import spaces
+    @spaces.GPU
+    def _zerogpu_startup():
+        return True
+except Exception:
+    pass
+
 
 def extract_slug(input_str: str) -> str:
     """Extrai o slug limpo mesmo se o usuário colar uma URL completa."""
