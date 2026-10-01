@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Ignora todas as pastas de novels geradas (cache e epubs)
+epub_*
+epub_*/
+
+# Ignora pastas de cache e arquivos epub avulsos
+*/.cache_chapters/
+*/.cache_covers/
+*/.cache_images/
+.cache_chapters/
+.cache_covers/
+.cache_images/
+*.epub
